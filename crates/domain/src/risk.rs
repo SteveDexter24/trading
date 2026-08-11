@@ -49,7 +49,7 @@ pub struct RiskContext {
 
 impl RiskContext {
     #[must_use]
-    pub const fn for_intent(&self, intent: &OrderIntent) -> bool {
+    pub fn for_intent(&self, intent: &OrderIntent) -> bool {
         self.quote.instrument.id == intent.instrument.id
     }
 }
