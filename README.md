@@ -4,6 +4,12 @@ A paper-only, asynchronous Rust trading-system foundation. It is a modular
 monolith with pure domain types and ports for market data, strategies, risk,
 brokers, storage, and time.
 
+Business logic follows a functional-core/imperative-shell design. Immutable
+domain transitions, risk rules, quote validation, signal generation, fill
+planning, and accounting are pure functions. Tokio, clocks, UUID generation,
+locks, PostgreSQL, and transports stay at the edges. Crate `lib.rs` files only
+declare focused modules and re-export their public APIs.
+
 ## Safety state
 
 - Trading mode is fixed to `Paper` by the risk policy and status API.
