@@ -1,0 +1,24 @@
+[Unit]
+Description=Paper Trading Engine
+After=network-online.target postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=trading
+Group=trading
+EnvironmentFile=/etc/trading-engine/environment
+ExecStart=/opt/trading-engine/trading-engine
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/trading-engine
+CapabilityBoundingSet=
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+[Install]
+WantedBy=multi-user.target

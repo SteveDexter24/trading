@@ -1,0 +1,23 @@
+[package]
+name = "trading-execution"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+chrono.workspace = true
+rust_decimal.workspace = true
+serde.workspace = true
+trading-domain = { path = "../domain" }
+uuid.workspace = true
+
+[dev-dependencies]
+tokio.workspace = true
+trading-paper-broker = { path = "../paper-broker" }
+trading-risk = { path = "../risk" }
+trading-storage = { path = "../storage" }
+trading-strategy = { path = "../strategy" }
+
+[lints]
+workspace = true
