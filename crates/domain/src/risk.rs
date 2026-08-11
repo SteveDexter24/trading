@@ -1,4 +1,4 @@
-use crate::{Money, OrderIntent, Quote};
+use crate::{Money, OrderIntent, Quantity, Quote};
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -43,6 +43,7 @@ pub struct RiskContext {
     pub portfolio_exposure: Money,
     pub daily_loss: Money,
     pub drawdown: Money,
+    pub open_position: Option<Quantity>,
     pub duplicate_order: bool,
     pub kill_switch_active: bool,
 }
@@ -50,6 +51,6 @@ pub struct RiskContext {
 impl RiskContext {
     #[must_use]
     pub fn for_intent(&self, intent: &OrderIntent) -> bool {
-        self.quote.instrument.id == intent.instrument.id
+        self.quote.instrument == intent.instrument
     }
 }

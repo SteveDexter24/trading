@@ -1,4 +1,4 @@
-use crate::{Instrument, Price, Quantity};
+use crate::{DomainError, Instrument, Price, Quantity};
 use chrono::{DateTime, NaiveDate, Utc};
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
@@ -17,14 +17,20 @@ pub struct Quote {
 }
 
 impl Quote {
-    #[must_use]
-    pub fn midpoint(&self) -> Price {
-        Price((self.bid.0 + self.ask.0) / Decimal::TWO)
+    pub fn validate_book(&self) -> Result<(), DomainError> {
+        (self.ask >= self.bid)
+            .then_some(())
+            .ok_or(DomainError::InvalidQuote)
     }
 
-    #[must_use]
-    pub fn spread_fraction(&self) -> Decimal {
-        (self.ask.0 - self.bid.0) / self.midpoint().0
+    pub fn midpoint(&self) -> Result<Price, DomainError> {
+        self.validate_book()?;
+        Price::new((self.bid.value() + self.ask.value()) / Decimal::TWO)
+    }
+
+    pub fn spread_fraction(&self) -> Result<Decimal, DomainError> {
+        let midpoint = self.midpoint()?;
+        Ok((self.ask.value() - self.bid.value()) / midpoint.value())
     }
 }
 

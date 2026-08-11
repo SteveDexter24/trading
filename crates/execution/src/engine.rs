@@ -1,8 +1,9 @@
 use crate::ExecutionOutcome;
 use std::sync::Arc;
 use trading_domain::{
-    ApprovedOrder, BrokerPort, BrokerReceipt, Clock, DomainError, MarketEvent, OrderIntent,
-    OrderStatus, Quantity, RiskContext, RiskEvaluator, RiskOutcome, StoragePort, StrategyPort,
+    ApprovedOrder, BrokerPort, BrokerReceipt, Clock, DomainError, Fill, MarketEvent, Order,
+    OrderIntent, OrderStatus, Quantity, RiskContext, RiskEvaluator, RiskOutcome, StoragePort,
+    StrategyPort,
 };
 
 pub struct TradingEngine {
@@ -12,6 +13,14 @@ pub struct TradingEngine {
     storage: Arc<dyn StoragePort>,
     clock: Arc<dyn Clock>,
     order_quantity: Quantity,
+}
+
+enum PreSubmitOutcome {
+    Terminal(ExecutionOutcome),
+    Submitted {
+        approved: Box<ApprovedOrder>,
+        order: Box<Order>,
+    },
 }
 
 impl TradingEngine {
@@ -39,23 +48,47 @@ impl TradingEngine {
         event: &MarketEvent,
         context: &RiskContext,
     ) -> Result<ExecutionOutcome, DomainError> {
-        if !self.storage.claim_event(event.event_id()).await? {
+        let event_id = event.event_id();
+        if !self.storage.claim_event(event_id).await? {
             return Ok(ExecutionOutcome::DuplicateEvent);
         }
+
+        match self.prepare_submission(event, context).await {
+            Ok(PreSubmitOutcome::Terminal(outcome)) => Ok(outcome),
+            Ok(PreSubmitOutcome::Submitted { approved, order }) => {
+                // Claim remains after a durable submitted order so restarts cannot
+                // create a second order for the same market event.
+                self.complete_submission(*approved, *order).await
+            }
+            Err(error) => {
+                self.storage.release_event(event_id).await?;
+                Err(error)
+            }
+        }
+    }
+
+    async fn prepare_submission(
+        &self,
+        event: &MarketEvent,
+        context: &RiskContext,
+    ) -> Result<PreSubmitOutcome, DomainError> {
+        let mut context = context.clone();
+        context.kill_switch_active = self.storage.kill_switch_active().await?;
+
         let Some(signal) = self.strategy.evaluate(event).await? else {
-            return Ok(ExecutionOutcome::NoSignal);
+            return Ok(PreSubmitOutcome::Terminal(ExecutionOutcome::NoSignal));
         };
 
         let intent = OrderIntent::from_signal(&signal, self.order_quantity, self.clock.now());
         self.storage.persist_intent(&intent).await?;
 
-        let decision = self.risk.evaluate(&intent, context).await?;
+        let decision = self.risk.evaluate(&intent, &context).await?;
         self.storage.persist_risk_decision(&decision).await?;
         if let RiskOutcome::Rejected { reasons } = &decision.outcome {
-            return Ok(ExecutionOutcome::RiskRejected {
+            return Ok(PreSubmitOutcome::Terminal(ExecutionOutcome::RiskRejected {
                 intent_id: intent.id,
                 reasons: reasons.clone(),
-            });
+            }));
         }
 
         let approved = ApprovedOrder::new(intent, &decision, self.clock.now())?;
@@ -63,7 +96,17 @@ impl TradingEngine {
 
         let order = approved.order().clone().submitted(self.clock.now())?;
         self.storage.persist_order(&order).await?;
+        Ok(PreSubmitOutcome::Submitted {
+            approved: Box::new(approved),
+            order: Box::new(order),
+        })
+    }
 
+    async fn complete_submission(
+        &self,
+        approved: ApprovedOrder,
+        order: Order,
+    ) -> Result<ExecutionOutcome, DomainError> {
         let receipt = match self.broker.submit(&approved).await {
             Ok(receipt) => receipt,
             Err(error) => {
@@ -81,7 +124,7 @@ impl TradingEngine {
 
     async fn persist_receipt(
         &self,
-        order: trading_domain::Order,
+        order: Order,
         receipt: BrokerReceipt,
     ) -> Result<ExecutionOutcome, DomainError> {
         let BrokerReceipt {
@@ -89,6 +132,11 @@ impl TradingEngine {
             acknowledged_at,
             fills,
         } = receipt;
+        if fills.is_empty() {
+            return Err(DomainError::IncompleteFill);
+        }
+        ensure_complete_fill(&order, &fills)?;
+
         let mut current = order.acknowledged(broker_order_id, acknowledged_at)?;
         self.storage.persist_order(&current).await?;
 
@@ -108,4 +156,16 @@ impl TradingEngine {
             order: Box::new(current),
         })
     }
+}
+
+fn ensure_complete_fill(order: &Order, fills: &[Fill]) -> Result<(), DomainError> {
+    let total = fills
+        .iter()
+        .try_fold(rust_decimal::Decimal::ZERO, |acc, fill| {
+            acc.checked_add(fill.quantity.value())
+                .ok_or_else(|| DomainError::Adapter("fill quantity overflow".to_owned()))
+        })?;
+    (total == order.intent.quantity.value())
+        .then_some(())
+        .ok_or(DomainError::IncompleteFill)
 }

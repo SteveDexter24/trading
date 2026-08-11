@@ -53,6 +53,18 @@ impl StoragePort for PostgresStorage {
         .map_err(storage_error)
     }
 
+    async fn release_event(&self, event_id: &str) -> Result<(), DomainError> {
+        sqlx::query(
+            "DELETE FROM system_events \
+             WHERE event_id = $1 AND event_type = 'market_event'",
+        )
+        .bind(event_id)
+        .execute(&self.pool)
+        .await
+        .map(|_| ())
+        .map_err(storage_error)
+    }
+
     async fn persist_intent(&self, intent: &OrderIntent) -> Result<(), DomainError> {
         sqlx::query(
             "INSERT INTO order_intents \
@@ -169,6 +181,47 @@ impl StoragePort for PostgresStorage {
             .await
             .map_err(storage_error)?,
         )
+    }
+
+    async fn risk_decisions(&self) -> Result<Vec<RiskDecision>, DomainError> {
+        deserialize_many(
+            sqlx::query_scalar::<_, serde_json::Value>(
+                "SELECT payload FROM risk_decisions ORDER BY evaluated_at",
+            )
+            .fetch_all(&self.pool)
+            .await
+            .map_err(storage_error)?,
+        )
+    }
+
+    async fn set_kill_switch(&self, active: bool) -> Result<(), DomainError> {
+        sqlx::query(
+            "INSERT INTO system_events \
+             (event_id, event_type, payload, occurred_at, ingested_at) \
+             VALUES ('global-kill-switch', 'kill_switch', jsonb_build_object('active', $1::bool), $2, $2) \
+             ON CONFLICT (event_id) DO UPDATE SET \
+               payload = EXCLUDED.payload, occurred_at = EXCLUDED.occurred_at, \
+               ingested_at = EXCLUDED.ingested_at",
+        )
+        .bind(active)
+        .bind(Utc::now())
+        .execute(&self.pool)
+        .await
+        .map(|_| ())
+        .map_err(storage_error)
+    }
+
+    async fn kill_switch_active(&self) -> Result<bool, DomainError> {
+        let payload = sqlx::query_scalar::<_, serde_json::Value>(
+            "SELECT payload FROM system_events WHERE event_id = 'global-kill-switch'",
+        )
+        .fetch_optional(&self.pool)
+        .await
+        .map_err(storage_error)?;
+
+        Ok(payload
+            .and_then(|value| value.get("active").and_then(serde_json::Value::as_bool))
+            .unwrap_or(false))
     }
 }
 

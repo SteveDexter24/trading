@@ -10,6 +10,10 @@ planning, and accounting are pure functions. Tokio, clocks, UUID generation,
 locks, PostgreSQL, and transports stay at the edges. Crate `lib.rs` files only
 declare focused modules and re-export their public APIs.
 
+Correctness guards include side-aware risk, lot-valid partial fills, complete
+fill checks, uncrossed/fresh quotes, validated decimal deserialization, event
+claim release before submission, and a shared kill switch via storage.
+
 ## Safety state
 
 - Trading mode is fixed to `Paper` by the risk policy and status API.

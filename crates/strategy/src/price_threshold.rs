@@ -28,29 +28,30 @@ impl PriceThresholdStrategy {
 #[async_trait]
 impl StrategyPort for PriceThresholdStrategy {
     async fn evaluate(&self, event: &MarketEvent) -> Result<Option<Signal>, DomainError> {
-        Ok(threshold_signal(
+        threshold_signal(
             Uuid::new_v4(),
             &self.id,
             event,
             self.maximum_entry_price,
             self.maximum_spread_fraction,
-        ))
+        )
     }
 }
 
-#[must_use]
 pub fn threshold_signal(
     signal_id: Uuid,
     strategy_id: &StrategyId,
     event: &MarketEvent,
     maximum_entry_price: Price,
     maximum_spread_fraction: Decimal,
-) -> Option<Signal> {
+) -> Result<Option<Signal>, DomainError> {
     let MarketEvent::Quote(quote) = event else {
-        return None;
+        return Ok(None);
     };
-    (quote.ask <= maximum_entry_price && quote.spread_fraction() <= maximum_spread_fraction).then(
-        || Signal {
+    quote.validate_book()?;
+    let spread = quote.spread_fraction()?;
+    Ok(
+        (quote.ask <= maximum_entry_price && spread <= maximum_spread_fraction).then(|| Signal {
             id: signal_id,
             strategy_id: strategy_id.clone(),
             instrument: quote.instrument.clone(),
@@ -58,6 +59,6 @@ pub fn threshold_signal(
             generated_at: quote.observed_at,
             rationale: "deterministic price and spread threshold".to_owned(),
             prediction: None,
-        },
+        }),
     )
 }

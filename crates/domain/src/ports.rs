@@ -37,6 +37,7 @@ pub trait BrokerPort: Send + Sync {
 #[async_trait]
 pub trait StoragePort: Send + Sync {
     async fn claim_event(&self, event_id: &str) -> Result<bool, DomainError>;
+    async fn release_event(&self, event_id: &str) -> Result<(), DomainError>;
     async fn persist_intent(&self, intent: &OrderIntent) -> Result<(), DomainError>;
     async fn persist_risk_decision(&self, decision: &RiskDecision) -> Result<(), DomainError>;
     async fn persist_order(&self, order: &Order) -> Result<(), DomainError>;
@@ -45,4 +46,7 @@ pub trait StoragePort: Send + Sync {
         -> Result<Option<Order>, DomainError>;
     async fn orders(&self) -> Result<Vec<Order>, DomainError>;
     async fn fills(&self) -> Result<Vec<Fill>, DomainError>;
+    async fn risk_decisions(&self) -> Result<Vec<RiskDecision>, DomainError>;
+    async fn set_kill_switch(&self, active: bool) -> Result<(), DomainError>;
+    async fn kill_switch_active(&self) -> Result<bool, DomainError>;
 }

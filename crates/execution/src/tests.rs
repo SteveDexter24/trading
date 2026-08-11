@@ -44,6 +44,7 @@ fn fixture() -> (MarketEvent, RiskContext, Instrument) {
         portfolio_exposure: Money::zero(Currency::Usd),
         daily_loss: Money::zero(Currency::Usd),
         drawdown: Money::zero(Currency::Usd),
+        open_position: None,
         duplicate_order: false,
         kill_switch_active: false,
     };
@@ -54,6 +55,7 @@ fn engine(
     storage: Arc<InMemoryStorage>,
     instrument: &Instrument,
     broker: Arc<PaperBroker>,
+    quantity: Quantity,
 ) -> TradingEngine {
     let strategy = PriceThresholdStrategy::new(
         StrategyId("short-term-baseline".to_owned()),
@@ -83,7 +85,7 @@ fn engine(
         broker,
         storage,
         Arc::new(SystemClock),
-        Quantity::new(Decimal::ONE).expect("quantity"),
+        quantity,
     )
 }
 
@@ -99,10 +101,15 @@ async fn synthetic_event_completes_auditable_paper_flow() {
         fill_policy: FillPolicy::PartialThenFull,
     }));
 
-    let result = engine(Arc::clone(&storage), &instrument, broker)
-        .process(&event, &context)
-        .await
-        .expect("flow");
+    let result = engine(
+        Arc::clone(&storage),
+        &instrument,
+        broker,
+        Quantity::new(Decimal::new(2, 0)).expect("quantity"),
+    )
+    .process(&event, &context)
+    .await
+    .expect("flow");
     let ExecutionOutcome::Filled { order } = result else {
         panic!("expected filled order");
     };
@@ -122,14 +129,20 @@ async fn restart_does_not_duplicate_simulated_order() {
         latency: Duration::ZERO,
         fill_policy: FillPolicy::Full,
     }));
-    let first = engine(Arc::clone(&storage), &instrument, Arc::clone(&broker));
+    let quantity = Quantity::new(Decimal::ONE).expect("quantity");
+    let first = engine(
+        Arc::clone(&storage),
+        &instrument,
+        Arc::clone(&broker),
+        quantity,
+    );
     assert!(matches!(
         first.process(&event, &context).await.expect("first"),
         ExecutionOutcome::Filled { .. }
     ));
     drop(first);
 
-    let restarted = engine(Arc::clone(&storage), &instrument, broker);
+    let restarted = engine(Arc::clone(&storage), &instrument, broker, quantity);
     assert_eq!(
         restarted.process(&event, &context).await.expect("replay"),
         ExecutionOutcome::DuplicateEvent
@@ -149,10 +162,92 @@ async fn risk_rejection_never_reaches_broker() {
         latency: Duration::ZERO,
         fill_policy: FillPolicy::Full,
     }));
-    let result = engine(Arc::clone(&storage), &instrument, broker)
-        .process(&event, &context)
-        .await
-        .expect("rejection");
+    let result = engine(
+        Arc::clone(&storage),
+        &instrument,
+        broker,
+        Quantity::new(Decimal::ONE).expect("quantity"),
+    )
+    .process(&event, &context)
+    .await
+    .expect("rejection");
     assert!(matches!(result, ExecutionOutcome::RiskRejected { .. }));
     assert!(storage.orders().await.expect("orders").is_empty());
+}
+
+#[tokio::test]
+async fn storage_kill_switch_blocks_submission() {
+    let (event, context, instrument) = fixture();
+    let storage = Arc::new(InMemoryStorage::new());
+    storage
+        .set_kill_switch(true)
+        .await
+        .expect("activate kill switch");
+    let broker = Arc::new(PaperBroker::new(ExecutionModel {
+        price: context.quote.ask,
+        currency: Currency::Usd,
+        fee: Money::zero(Currency::Usd),
+        latency: Duration::ZERO,
+        fill_policy: FillPolicy::Full,
+    }));
+    let result = engine(
+        Arc::clone(&storage),
+        &instrument,
+        broker,
+        Quantity::new(Decimal::ONE).expect("quantity"),
+    )
+    .process(&event, &context)
+    .await
+    .expect("rejection");
+    assert!(matches!(result, ExecutionOutcome::RiskRejected { .. }));
+}
+
+#[tokio::test]
+async fn successful_submission_keeps_event_claim() {
+    let (event, context, instrument) = fixture();
+    let storage = Arc::new(InMemoryStorage::new());
+    // Force strategy/risk path by using an empty allowlist via a custom engine.
+    let strategy = PriceThresholdStrategy::new(
+        StrategyId("short-term-baseline".to_owned()),
+        Price::new(Decimal::new(25_000, 2)).expect("maximum price"),
+        Decimal::new(1, 2),
+    );
+    let limits = RiskLimits {
+        maximum_quote_age: ChronoDuration::seconds(5),
+        maximum_order_value: Money::new(Decimal::new(5_000, 0), Currency::Usd).expect("limit"),
+        maximum_position_exposure: Money::new(Decimal::new(10_000, 0), Currency::Usd)
+            .expect("limit"),
+        maximum_strategy_exposure: Money::new(Decimal::new(25_000, 0), Currency::Usd)
+            .expect("limit"),
+        maximum_portfolio_exposure: Money::new(Decimal::new(100_000, 0), Currency::Usd)
+            .expect("limit"),
+        maximum_daily_loss: Money::new(Decimal::new(5_000, 0), Currency::Usd).expect("limit"),
+        maximum_drawdown: Money::new(Decimal::new(10_000, 0), Currency::Usd).expect("limit"),
+        maximum_spread_fraction: Decimal::new(1, 2),
+    };
+    let broker = Arc::new(PaperBroker::new(ExecutionModel {
+        price: context.quote.ask,
+        currency: Currency::Usd,
+        fee: Money::zero(Currency::Usd),
+        latency: Duration::ZERO,
+        fill_policy: FillPolicy::Full,
+    }));
+    // Empty allowlist rejects after claim; outcome is terminal RiskRejected and claim is kept.
+    let engine = TradingEngine::new(
+        Arc::new(strategy),
+        Arc::new(RuleBasedRisk::new(
+            [instrument.id],
+            limits,
+            Box::new(SystemClock),
+        )),
+        broker,
+        Arc::clone(&storage) as Arc<dyn StoragePort>,
+        Arc::new(SystemClock),
+        Quantity::new(Decimal::ONE).expect("quantity"),
+    );
+    let _ = engine.process(&event, &context).await.expect("ok path");
+    assert!(!storage
+        .claim_event(event.event_id())
+        .await
+        .expect("second claim"));
 }

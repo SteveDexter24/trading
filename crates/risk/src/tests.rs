@@ -58,6 +58,7 @@ fn fixture() -> (OrderIntent, RiskContext, RiskLimits, DateTime<Utc>) {
         portfolio_exposure: Money::zero(Currency::Hkd),
         daily_loss: Money::zero(Currency::Hkd),
         drawdown: Money::zero(Currency::Hkd),
+        open_position: None,
         duplicate_order: false,
         kill_switch_active: false,
     };
@@ -101,6 +102,27 @@ async fn approves_valid_paper_order() {
     let decision = risk.evaluate(&intent, &context).await.expect("decision");
     assert!(decision.approved());
     assert!(decision.checks.values().all(|passed| *passed));
+}
+
+#[tokio::test]
+async fn sell_requires_open_position_and_uses_bid() {
+    let (mut intent, mut context, limits, now) = fixture();
+    intent.side = Side::Sell;
+    context.open_position = None;
+    assert_rule_rejects(
+        "sellable_position",
+        &intent,
+        &context,
+        limits,
+        now,
+        vec![intent.instrument.id],
+    )
+    .await;
+
+    context.open_position = Some(intent.quantity);
+    let risk = RuleBasedRisk::new([intent.instrument.id], limits, Box::new(FixedClock(now)));
+    let decision = risk.evaluate(&intent, &context).await.expect("decision");
+    assert!(decision.approved());
 }
 
 #[tokio::test]
@@ -179,6 +201,19 @@ async fn every_configured_risk_rule_has_a_rejection_case() {
     .await;
 
     changed = context.clone();
+    changed.quote.bid = Price::new(Decimal::new(40_100, 2)).expect("bid");
+    changed.quote.ask = Price::new(Decimal::new(40_000, 2)).expect("ask");
+    assert_rule_rejects(
+        "quote_book",
+        &intent,
+        &changed,
+        limits,
+        now,
+        allowed.clone(),
+    )
+    .await;
+
+    changed = context.clone();
     changed.market_session_open = false;
     assert_rule_rejects(
         "market_session",
@@ -243,11 +278,36 @@ async fn every_configured_risk_rule_has_a_rejection_case() {
     .await;
 
     changed = context.clone();
+    changed.quote.observed_at = now + Duration::seconds(1);
+    assert_rule_rejects(
+        "quote_freshness",
+        &intent,
+        &changed,
+        limits,
+        now,
+        allowed.clone(),
+    )
+    .await;
+
+    changed = context.clone();
     changed.settled_cash = Money::zero(Currency::Hkd);
     assert_rule_rejects(
         "settled_cash",
         &intent,
         &changed,
+        limits,
+        now,
+        allowed.clone(),
+    )
+    .await;
+
+    changed_intent = intent.clone();
+    changed_intent.side = Side::Sell;
+    changed_intent.order_type = OrderType::Market;
+    assert_rule_rejects(
+        "sellable_position",
+        &changed_intent,
+        &context,
         limits,
         now,
         allowed.clone(),

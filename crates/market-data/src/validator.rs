@@ -34,10 +34,15 @@ pub fn validate_quote(
     now: DateTime<Utc>,
     max_age: Duration,
 ) -> Result<(), DomainError> {
-    let timestamp_is_valid = now.signed_duration_since(quote.observed_at) <= max_age
-        && quote.observed_at >= quote.occurred_at;
+    quote.validate_book()?;
+    let age = now.signed_duration_since(quote.observed_at);
+    let timestamp_is_valid = age >= Duration::zero()
+        && age <= max_age
+        && quote.observed_at >= quote.occurred_at
+        && quote.observed_at <= now;
+    // Same-timestamp bursts are allowed when the sequence advances.
     let sequence_is_valid = previous.is_none_or(|prior| {
-        quote.sequence > prior.sequence && quote.occurred_at > prior.occurred_at
+        quote.sequence > prior.sequence && quote.occurred_at >= prior.occurred_at
     });
 
     (timestamp_is_valid && sequence_is_valid)
@@ -93,6 +98,30 @@ mod tests {
         data.ingest(quote(2, now), now).await.expect("first quote");
         assert_eq!(
             data.ingest(quote(1, now - Duration::seconds(1)), now).await,
+            Err(DomainError::InvalidMarketDataOrder)
+        );
+    }
+
+    #[tokio::test]
+    async fn rejects_crossed_markets() {
+        let now = Utc::now();
+        let mut crossed = quote(1, now);
+        crossed.bid = Price::new(Decimal::new(10_020, 2)).expect("bid");
+        crossed.ask = Price::new(Decimal::new(10_010, 2)).expect("ask");
+        let data = ValidatedMarketData::new(Duration::seconds(5));
+        assert_eq!(
+            data.ingest(crossed, now).await,
+            Err(DomainError::InvalidQuote)
+        );
+    }
+
+    #[tokio::test]
+    async fn rejects_future_observations() {
+        let now = Utc::now();
+        let future = quote(1, now + Duration::seconds(1));
+        let data = ValidatedMarketData::new(Duration::seconds(5));
+        assert_eq!(
+            data.ingest(future, now).await,
             Err(DomainError::InvalidMarketDataOrder)
         );
     }

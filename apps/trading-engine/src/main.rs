@@ -53,6 +53,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         portfolio_exposure: Money::zero(Currency::Usd),
         daily_loss: Money::zero(Currency::Usd),
         drawdown: Money::zero(Currency::Usd),
+        open_position: None,
         duplicate_order: false,
         kill_switch_active: false,
     };

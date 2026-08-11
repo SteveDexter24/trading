@@ -17,6 +17,10 @@ pub enum DomainError {
     DuplicateEvent(String),
     #[error("stale or out-of-order market data")]
     InvalidMarketDataOrder,
+    #[error("fill completion does not match the order quantity")]
+    IncompleteFill,
+    #[error("crossed or invalid quote")]
+    InvalidQuote,
     #[error("adapter error: {0}")]
     Adapter(String),
     #[error("storage error: {0}")]

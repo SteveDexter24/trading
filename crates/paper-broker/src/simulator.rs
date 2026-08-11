@@ -4,7 +4,8 @@ use rust_decimal::Decimal;
 use std::{collections::HashMap, time::Duration};
 use tokio::sync::Mutex;
 use trading_domain::{
-    ApprovedOrder, BrokerPort, BrokerReceipt, Currency, DomainError, Fill, Money, Price, Quantity,
+    ApprovedOrder, BrokerPort, BrokerReceipt, Currency, DomainError, Fill, Instrument, Money,
+    Price, Quantity,
 };
 use uuid::Uuid;
 
@@ -32,6 +33,7 @@ pub struct PlannedFill {
 }
 
 pub fn plan_fills(
+    instrument: &Instrument,
     quantity: Quantity,
     currency: Currency,
     fee: Money,
@@ -44,15 +46,15 @@ pub fn plan_fills(
             event_suffix: "full",
         }]),
         FillPolicy::PartialThenFull => {
-            let half = Quantity::new(quantity.value() / Decimal::TWO)?;
+            let (first, second) = split_quantity(instrument, quantity)?;
             Ok(vec![
                 PlannedFill {
-                    quantity: half,
+                    quantity: first,
                     fee: Money::zero(currency),
                     event_suffix: "partial",
                 },
                 PlannedFill {
-                    quantity: half,
+                    quantity: second,
                     fee,
                     event_suffix: "final",
                 },
@@ -62,6 +64,28 @@ pub fn plan_fills(
             "paper broker configured to reject order".to_owned(),
         )),
     }
+}
+
+fn split_quantity(
+    instrument: &Instrument,
+    quantity: Quantity,
+) -> Result<(Quantity, Quantity), DomainError> {
+    let half = quantity.value() / Decimal::TWO;
+    let first = if instrument.fractional_supported {
+        Quantity::new(half.round_dp(8))?
+    } else {
+        let lot = instrument.board_lot.value();
+        let lots = (half / lot).floor();
+        let first_value = lots * lot;
+        if first_value <= Decimal::ZERO || first_value >= quantity.value() {
+            return Err(DomainError::Adapter(
+                "unable to split quantity into valid board lots".to_owned(),
+            ));
+        }
+        Quantity::new(first_value)?
+    };
+    let second = quantity.checked_sub(first)?;
+    Ok((first, second))
 }
 
 #[derive(Debug)]
@@ -102,17 +126,23 @@ impl BrokerPort for PaperBroker {
     async fn submit(&self, order: &ApprovedOrder) -> Result<BrokerReceipt, DomainError> {
         let client_order_id = order.order().intent.client_order_id;
         validate_currency(self.model, order)?;
-        if let Some(receipt) = self.receipts.lock().await.get(&client_order_id).cloned() {
-            return Ok(receipt);
+
+        {
+            let receipts = self.receipts.lock().await;
+            if let Some(receipt) = receipts.get(&client_order_id) {
+                return Ok(receipt.clone());
+            }
         }
 
         let plans = plan_fills(
+            &order.order().intent.instrument,
             order.order().intent.quantity,
             self.model.currency,
             self.model.fee,
             self.model.fill_policy,
         )?;
         tokio::time::sleep(self.model.latency).await;
+
         let receipt = BrokerReceipt {
             broker_order_id: format!("paper-{client_order_id}"),
             acknowledged_at: Utc::now(),
@@ -121,11 +151,9 @@ impl BrokerPort for PaperBroker {
                 .map(|plan| self.create_fill(order, plan))
                 .collect(),
         };
-        self.receipts
-            .lock()
-            .await
-            .insert(client_order_id, receipt.clone());
-        Ok(receipt)
+
+        let mut receipts = self.receipts.lock().await;
+        Ok(receipts.entry(client_order_id).or_insert(receipt).clone())
     }
 }
 

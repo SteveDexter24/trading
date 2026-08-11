@@ -1,6 +1,6 @@
 use crate::{Currency, DomainError};
 use rust_decimal::Decimal;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Money {
@@ -79,9 +79,8 @@ impl Money {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct Price(#[serde(with = "rust_decimal::serde::str")] pub Decimal);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Price(Decimal);
 
 impl Price {
     pub fn new(value: Decimal) -> Result<Self, DomainError> {
@@ -103,9 +102,27 @@ impl Price {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct Quantity(#[serde(with = "rust_decimal::serde::str")] pub Decimal);
+impl Serialize for Price {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        rust_decimal::serde::str::serialize(&self.0, serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Price {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = rust_decimal::serde::str::deserialize(deserializer)?;
+        Self::new(value).map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Quantity(Decimal);
 
 impl Quantity {
     pub fn new(value: Decimal) -> Result<Self, DomainError> {
@@ -117,5 +134,43 @@ impl Quantity {
     #[must_use]
     pub const fn value(self) -> Decimal {
         self.0
+    }
+
+    pub fn checked_add(self, other: Self) -> Result<Self, DomainError> {
+        self.0
+            .checked_add(other.0)
+            .and_then(|value| (value > Decimal::ZERO).then_some(Self(value)))
+            .ok_or_else(|| DomainError::Adapter("quantity overflow".to_owned()))
+    }
+
+    pub fn checked_sub(self, other: Self) -> Result<Self, DomainError> {
+        self.0
+            .checked_sub(other.0)
+            .filter(|value| *value > Decimal::ZERO)
+            .map(Self)
+            .ok_or(DomainError::NonPositiveValue)
+    }
+
+    pub fn is_at_most(self, other: Self) -> bool {
+        self.0 <= other.0
+    }
+}
+
+impl Serialize for Quantity {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        rust_decimal::serde::str::serialize(&self.0, serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for Quantity {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let value = rust_decimal::serde::str::deserialize(deserializer)?;
+        Self::new(value).map_err(serde::de::Error::custom)
     }
 }

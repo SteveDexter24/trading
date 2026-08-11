@@ -6,30 +6,16 @@ use axum::{
     Json, Router,
 };
 use secrecy::{ExposeSecret, SecretString};
-use serde::{Deserialize, Serialize};
+use serde::Deserialize;
 use serde_json::{json, Value};
-use std::{
-    env,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
-};
+use std::{env, sync::Arc};
 use tokio::net::TcpListener;
 use trading_domain::StoragePort;
 use trading_storage::{InMemoryStorage, PostgresStorage};
 
 struct ApiState {
     storage: Arc<dyn StoragePort>,
-    kill_switch: AtomicBool,
     admin_token: Option<SecretString>,
-}
-
-#[derive(Debug, Serialize)]
-struct SystemStatus {
-    trading_mode: &'static str,
-    production_submission_enabled: bool,
-    kill_switch_active: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -55,7 +41,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
     let state = Arc::new(ApiState {
         storage,
-        kill_switch: AtomicBool::new(false),
         admin_token: env::var("ADMIN_API_TOKEN").ok().map(SecretString::from),
     });
     let app = Router::new()
@@ -67,7 +52,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .route("/v1/orders", get(orders))
         .route("/v1/fills", get(fills))
         .route("/v1/signals", get(empty_collection))
-        .route("/v1/risk-decisions", get(empty_collection))
+        .route("/v1/risk-decisions", get(risk_decisions))
         .route("/v1/system/kill-switch", post(set_kill_switch))
         .with_state(state);
 
@@ -88,7 +73,7 @@ async fn health() -> Json<Value> {
 }
 
 async fn ready(State(state): State<Arc<ApiState>>) -> impl IntoResponse {
-    match state.storage.orders().await {
+    match state.storage.kill_switch_active().await {
         Ok(_) => (StatusCode::OK, Json(json!({ "status": "ready" }))),
         Err(_) => (
             StatusCode::SERVICE_UNAVAILABLE,
@@ -97,12 +82,21 @@ async fn ready(State(state): State<Arc<ApiState>>) -> impl IntoResponse {
     }
 }
 
-async fn status(State(state): State<Arc<ApiState>>) -> Json<SystemStatus> {
-    Json(SystemStatus {
-        trading_mode: "paper",
-        production_submission_enabled: false,
-        kill_switch_active: state.kill_switch.load(Ordering::SeqCst),
-    })
+async fn status(State(state): State<Arc<ApiState>>) -> impl IntoResponse {
+    match state.storage.kill_switch_active().await {
+        Ok(active) => (
+            StatusCode::OK,
+            Json(json!({
+                "trading_mode": "paper",
+                "production_submission_enabled": false,
+                "kill_switch_active": active,
+            })),
+        ),
+        Err(error) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": error.to_string() })),
+        ),
+    }
 }
 
 async fn empty_collection() -> Json<Value> {
@@ -129,6 +123,16 @@ async fn fills(State(state): State<Arc<ApiState>>) -> impl IntoResponse {
     }
 }
 
+async fn risk_decisions(State(state): State<Arc<ApiState>>) -> impl IntoResponse {
+    match state.storage.risk_decisions().await {
+        Ok(items) => (StatusCode::OK, Json(json!({ "items": items }))),
+        Err(error) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": error.to_string() })),
+        ),
+    }
+}
+
 async fn set_kill_switch(
     State(state): State<Arc<ApiState>>,
     headers: HeaderMap,
@@ -145,7 +149,12 @@ async fn set_kill_switch(
             Json(json!({ "error": "authentication required" })),
         );
     }
-    state.kill_switch.store(request.active, Ordering::SeqCst);
+    if let Err(error) = state.storage.set_kill_switch(request.active).await {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({ "error": error.to_string() })),
+        );
+    }
     (
         StatusCode::OK,
         Json(json!({ "active": request.active, "trading_mode": "paper" })),
