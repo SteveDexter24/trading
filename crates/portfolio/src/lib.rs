@@ -3,7 +3,9 @@
 use trading_domain::{DomainError, Fill, Money};
 
 pub fn cash_debit(fill: &Fill) -> Result<Money, DomainError> {
-    fill.price.times(fill.quantity)?.checked_add(fill.fee)
+    fill.price
+        .times(fill.quantity, fill.currency)?
+        .checked_add(fill.fee)
 }
 
 #[cfg(test)]
@@ -31,13 +33,13 @@ mod tests {
                 order_id: Uuid::new_v4(),
                 quantity: Quantity::new(quantity_value).expect("positive"),
                 price: Price::new(price_value).expect("positive"),
-                fee: Money::new(fee_value).expect("non-negative"),
+                fee: Money::new(fee_value, Currency::Usd).expect("non-negative"),
                 currency: Currency::Usd,
                 filled_at: Utc::now(),
             };
 
             prop_assert_eq!(
-                cash_debit(&fill).expect("debit").value(),
+                cash_debit(&fill).expect("debit").amount(),
                 price_value * quantity_value + fee_value
             );
         }

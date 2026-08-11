@@ -220,15 +220,19 @@ impl StoragePort for PostgresStorage {
         .fetch_optional(&self.pool)
         .await
         .map_err(storage_error)?;
-        payload.map(serde_json::from_value).transpose().map_err(storage_error)
+        payload
+            .map(serde_json::from_value)
+            .transpose()
+            .map_err(storage_error)
     }
 
     async fn orders(&self) -> Result<Vec<Order>, DomainError> {
-        let payloads =
-            sqlx::query_scalar::<_, serde_json::Value>("SELECT payload FROM orders ORDER BY updated_at")
-                .fetch_all(&self.pool)
-                .await
-                .map_err(storage_error)?;
+        let payloads = sqlx::query_scalar::<_, serde_json::Value>(
+            "SELECT payload FROM orders ORDER BY updated_at",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(storage_error)?;
         payloads
             .into_iter()
             .map(serde_json::from_value)
@@ -237,11 +241,12 @@ impl StoragePort for PostgresStorage {
     }
 
     async fn fills(&self) -> Result<Vec<Fill>, DomainError> {
-        let payloads =
-            sqlx::query_scalar::<_, serde_json::Value>("SELECT payload FROM fills ORDER BY filled_at")
-                .fetch_all(&self.pool)
-                .await
-                .map_err(storage_error)?;
+        let payloads = sqlx::query_scalar::<_, serde_json::Value>(
+            "SELECT payload FROM fills ORDER BY filled_at",
+        )
+        .fetch_all(&self.pool)
+        .await
+        .map_err(storage_error)?;
         payloads
             .into_iter()
             .map(serde_json::from_value)

@@ -2,6 +2,7 @@
 
 use async_trait::async_trait;
 use chrono::Utc;
+use rust_decimal::Decimal;
 use std::collections::HashMap;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -20,6 +21,7 @@ pub enum FillPolicy {
 #[derive(Debug, Clone, Copy)]
 pub struct ExecutionModel {
     pub price: Price,
+    pub currency: Currency,
     pub fee: Money,
     pub latency: Duration,
     pub fill_policy: FillPolicy,
@@ -49,7 +51,10 @@ impl PaperBroker {
     ) -> Fill {
         Fill {
             id: Uuid::new_v4(),
-            event_id: format!("paper-fill-{}-{suffix}", order.order().intent.client_order_id),
+            event_id: format!(
+                "paper-fill-{}-{suffix}",
+                order.order().intent.client_order_id
+            ),
             order_id: order.order().id,
             quantity,
             price,
@@ -64,6 +69,18 @@ impl PaperBroker {
 impl BrokerPort for PaperBroker {
     async fn submit(&self, order: &ApprovedOrder) -> Result<BrokerReceipt, DomainError> {
         let client_order_id = order.order().intent.client_order_id;
+        if self.model.currency != order.order().intent.instrument.currency {
+            return Err(DomainError::CurrencyMismatch {
+                left: self.model.currency,
+                right: order.order().intent.instrument.currency,
+            });
+        }
+        if self.model.fee.currency() != self.model.currency {
+            return Err(DomainError::CurrencyMismatch {
+                left: self.model.fee.currency(),
+                right: self.model.currency,
+            });
+        }
         if let Some(receipt) = self.receipts.lock().await.get(&client_order_id).cloned() {
             return Ok(receipt);
         }
@@ -83,22 +100,16 @@ impl BrokerPort for PaperBroker {
                 "full",
             )],
             FillPolicy::PartialThenFull => {
-                let half = Quantity::new(order.order().intent.quantity.value() / 2.into())?;
+                let half = Quantity::new(order.order().intent.quantity.value() / Decimal::TWO)?;
                 vec![
                     Self::create_fill(
                         order,
                         half,
                         self.model.price,
-                        Money::ZERO,
+                        Money::zero(order.order().intent.instrument.currency),
                         "partial",
                     ),
-                    Self::create_fill(
-                        order,
-                        half,
-                        self.model.price,
-                        self.model.fee,
-                        "final",
-                    ),
+                    Self::create_fill(order, half, self.model.price, self.model.fee, "final"),
                 ]
             }
             FillPolicy::Reject => unreachable!("rejection returned before fill generation"),

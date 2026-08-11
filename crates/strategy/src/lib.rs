@@ -2,9 +2,7 @@
 
 use async_trait::async_trait;
 use rust_decimal::Decimal;
-use trading_domain::{
-    DomainError, MarketEvent, Price, Side, Signal, StrategyId, StrategyPort,
-};
+use trading_domain::{DomainError, MarketEvent, Price, Side, Signal, StrategyId, StrategyPort};
 use uuid::Uuid;
 
 #[derive(Debug, Clone)]

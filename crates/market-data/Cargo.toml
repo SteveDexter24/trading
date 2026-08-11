@@ -12,5 +12,8 @@ tokio.workspace = true
 trading-domain = { path = "../domain" }
 uuid.workspace = true
 
+[dev-dependencies]
+rust_decimal.workspace = true
+
 [lints]
 workspace = true

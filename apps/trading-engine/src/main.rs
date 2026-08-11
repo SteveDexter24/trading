@@ -18,8 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt()
         .json()
         .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "info".into()),
+            tracing_subscriber::EnvFilter::try_from_default_env().unwrap_or_else(|_| "info".into()),
         )
         .init();
 
@@ -48,23 +47,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         mode: TradingMode::Paper,
         quote: quote.clone(),
         market_session_open: true,
-        settled_cash: Money::new(Decimal::new(100_000, 0))?,
-        position_exposure: Money::ZERO,
-        strategy_exposure: Money::ZERO,
-        portfolio_exposure: Money::ZERO,
-        daily_loss: Money::ZERO,
-        drawdown: Money::ZERO,
+        settled_cash: Money::new(Decimal::new(100_000, 0), Currency::Usd)?,
+        position_exposure: Money::zero(Currency::Usd),
+        strategy_exposure: Money::zero(Currency::Usd),
+        portfolio_exposure: Money::zero(Currency::Usd),
+        daily_loss: Money::zero(Currency::Usd),
+        drawdown: Money::zero(Currency::Usd),
         duplicate_order: false,
         kill_switch_active: false,
     };
     let limits = RiskLimits {
         maximum_quote_age: ChronoDuration::seconds(5),
-        maximum_order_value: Money::new(Decimal::new(5_000, 0))?,
-        maximum_position_exposure: Money::new(Decimal::new(10_000, 0))?,
-        maximum_strategy_exposure: Money::new(Decimal::new(25_000, 0))?,
-        maximum_portfolio_exposure: Money::new(Decimal::new(100_000, 0))?,
-        maximum_daily_loss: Money::new(Decimal::new(5_000, 0))?,
-        maximum_drawdown: Money::new(Decimal::new(10_000, 0))?,
+        maximum_order_value: Money::new(Decimal::new(5_000, 0), Currency::Usd)?,
+        maximum_position_exposure: Money::new(Decimal::new(10_000, 0), Currency::Usd)?,
+        maximum_strategy_exposure: Money::new(Decimal::new(25_000, 0), Currency::Usd)?,
+        maximum_portfolio_exposure: Money::new(Decimal::new(100_000, 0), Currency::Usd)?,
+        maximum_daily_loss: Money::new(Decimal::new(5_000, 0), Currency::Usd)?,
+        maximum_drawdown: Money::new(Decimal::new(10_000, 0), Currency::Usd)?,
         maximum_spread_fraction: Decimal::new(1, 2),
     };
     let storage: Arc<dyn StoragePort> = if let Ok(database_url) = env::var("DATABASE_URL") {
@@ -87,17 +86,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )),
         Arc::new(PaperBroker::new(ExecutionModel {
             price: quote.ask,
-            fee: Money::new(Decimal::new(1, 0))?,
+            currency: Currency::Usd,
+            fee: Money::new(Decimal::new(1, 0), Currency::Usd)?,
             latency: Duration::from_millis(5),
             fill_policy: FillPolicy::Full,
         })),
         storage,
+        Arc::new(SystemClock),
         Quantity::new(Decimal::ONE)?,
     );
 
-    let outcome = engine
-        .process(&MarketEvent::Quote(quote), &context)
-        .await?;
+    let outcome = engine.process(&MarketEvent::Quote(quote), &context).await?;
     info!(
         trading_mode = "paper",
         outcome = %serde_json::to_string(&outcome)?,

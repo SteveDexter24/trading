@@ -62,11 +62,8 @@ impl WebullTransport {
             .https_only(true)
             .build()
             .map_err(adapter_error)?;
-        let mut mqtt = MqttOptions::new(
-            "trading-system-sandbox",
-            "data-api.sandbox.webull.com",
-            443,
-        );
+        let mut mqtt =
+            MqttOptions::new("trading-system-sandbox", "data-api.sandbox.webull.com", 443);
         mqtt.set_keep_alive(Duration::from_secs(30));
         let grpc = Endpoint::from_static("https://events-api.sandbox.webull.com");
         Ok(Self {
@@ -85,10 +82,7 @@ pub struct WebullBroker {
 }
 
 impl WebullBroker {
-    pub fn sandbox(
-        market: WebullMarket,
-        transport: WebullTransport,
-    ) -> Result<Self, DomainError> {
+    pub fn sandbox(market: WebullMarket, transport: WebullTransport) -> Result<Self, DomainError> {
         if market == WebullMarket::HongKong {
             return Err(DomainError::Adapter(
                 "official Webull HK order contract has not been verified".to_owned(),

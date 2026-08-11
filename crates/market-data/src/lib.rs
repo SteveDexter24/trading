@@ -87,8 +87,7 @@ mod tests {
         let data = ValidatedMarketData::new(Duration::seconds(5));
         data.ingest(quote(2, now), now).await.expect("first quote");
         assert_eq!(
-            data.ingest(quote(1, now - Duration::seconds(1)), now)
-                .await,
+            data.ingest(quote(1, now - Duration::seconds(1)), now).await,
             Err(DomainError::InvalidMarketDataOrder)
         );
     }

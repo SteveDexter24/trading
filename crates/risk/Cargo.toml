@@ -12,5 +12,8 @@ rust_decimal.workspace = true
 trading-domain = { path = "../domain" }
 uuid.workspace = true
 
+[dev-dependencies]
+tokio.workspace = true
+
 [lints]
 workspace = true

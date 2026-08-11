@@ -75,43 +75,81 @@ pub struct Instrument {
     pub fractional_supported: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct Money(#[serde(with = "rust_decimal::serde::str")] pub Decimal);
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Money {
+    #[serde(with = "rust_decimal::serde::str")]
+    amount: Decimal,
+    currency: Currency,
+}
 
 impl Money {
-    pub const ZERO: Self = Self(Decimal::ZERO);
-
-    pub fn new(value: Decimal) -> Result<Self, DomainError> {
-        if value.is_sign_negative() {
+    pub fn new(amount: Decimal, currency: Currency) -> Result<Self, DomainError> {
+        if amount.is_sign_negative() {
             Err(DomainError::NegativeAmount)
         } else {
-            Ok(Self(value))
+            Ok(Self { amount, currency })
         }
     }
 
     #[must_use]
-    pub const fn value(self) -> Decimal {
-        self.0
+    pub const fn zero(currency: Currency) -> Self {
+        Self {
+            amount: Decimal::ZERO,
+            currency,
+        }
+    }
+
+    #[must_use]
+    pub const fn amount(self) -> Decimal {
+        self.amount
+    }
+
+    #[must_use]
+    pub const fn currency(self) -> Currency {
+        self.currency
     }
 
     pub fn checked_add(self, other: Self) -> Result<Self, DomainError> {
-        self.0
-            .checked_add(other.0)
-            .map(Self)
+        self.ensure_same_currency(other)?;
+        self.amount
+            .checked_add(other.amount)
+            .map(|amount| Self {
+                amount,
+                currency: self.currency,
+            })
             .ok_or_else(|| DomainError::Adapter("money overflow".to_owned()))
     }
 
     pub fn checked_sub(self, other: Self) -> Result<Self, DomainError> {
-        self.0
-            .checked_sub(other.0)
-            .filter(|value| !value.is_sign_negative())
-            .map(Self)
+        self.ensure_same_currency(other)?;
+        self.amount
+            .checked_sub(other.amount)
+            .filter(|amount| !amount.is_sign_negative())
+            .map(|amount| Self {
+                amount,
+                currency: self.currency,
+            })
             .ok_or(DomainError::NegativeAmount)
+    }
+
+    pub fn is_at_most(self, other: Self) -> Result<bool, DomainError> {
+        self.ensure_same_currency(other)?;
+        Ok(self.amount <= other.amount)
+    }
+
+    fn ensure_same_currency(self, other: Self) -> Result<(), DomainError> {
+        if self.currency == other.currency {
+            Ok(())
+        } else {
+            Err(DomainError::CurrencyMismatch {
+                left: self.currency,
+                right: other.currency,
+            })
+        }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Price(#[serde(with = "rust_decimal::serde::str")] pub Decimal);
 
@@ -129,10 +167,10 @@ impl Price {
         self.0
     }
 
-    pub fn times(self, quantity: Quantity) -> Result<Money, DomainError> {
+    pub fn times(self, quantity: Quantity, currency: Currency) -> Result<Money, DomainError> {
         self.0
             .checked_mul(quantity.0)
-            .map(Money)
+            .map(|amount| Money { amount, currency })
             .ok_or_else(|| DomainError::Adapter("notional overflow".to_owned()))
     }
 }
@@ -504,8 +542,21 @@ mod tests {
     #[test]
     fn rejects_negative_money() {
         assert_eq!(
-            Money::new(Decimal::NEGATIVE_ONE),
+            Money::new(Decimal::NEGATIVE_ONE, Currency::Usd),
             Err(DomainError::NegativeAmount)
+        );
+    }
+
+    #[test]
+    fn rejects_implicit_fx_arithmetic() {
+        let usd = Money::new(Decimal::ONE, Currency::Usd).expect("USD");
+        let hkd = Money::new(Decimal::ONE, Currency::Hkd).expect("HKD");
+        assert_eq!(
+            usd.checked_add(hkd),
+            Err(DomainError::CurrencyMismatch {
+                left: Currency::Usd,
+                right: Currency::Hkd,
+            })
         );
     }
 
@@ -514,7 +565,10 @@ mod tests {
         let price = Price::new(Decimal::new(10_125, 2)).expect("valid price");
         let quantity = Quantity::new(Decimal::new(25, 1)).expect("valid quantity");
         assert_eq!(
-            price.times(quantity).expect("valid notional").value(),
+            price
+                .times(quantity, Currency::Usd)
+                .expect("valid notional")
+                .amount(),
             Decimal::new(25_3125, 3)
         );
     }

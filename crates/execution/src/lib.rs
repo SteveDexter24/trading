@@ -1,11 +1,10 @@
 //! Auditable order orchestration.
 
-use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use trading_domain::{
-    ApprovedOrder, BrokerPort, DomainError, MarketEvent, Order, OrderIntent, OrderStatus, Quantity,
-    RiskContext, RiskEvaluator, RiskOutcome, StoragePort, StrategyPort,
+    ApprovedOrder, BrokerPort, Clock, DomainError, MarketEvent, Order, OrderIntent, OrderStatus,
+    Quantity, RiskContext, RiskEvaluator, RiskOutcome, StoragePort, StrategyPort,
 };
 use uuid::Uuid;
 
@@ -14,9 +13,17 @@ use uuid::Uuid;
 pub enum ExecutionOutcome {
     NoSignal,
     DuplicateEvent,
-    RiskRejected { intent_id: Uuid, reasons: Vec<String> },
-    BrokerRejected { order_id: Uuid, reason: String },
-    Filled { order: Order },
+    RiskRejected {
+        intent_id: Uuid,
+        reasons: Vec<String>,
+    },
+    BrokerRejected {
+        order_id: Uuid,
+        reason: String,
+    },
+    Filled {
+        order: Box<Order>,
+    },
 }
 
 pub struct TradingEngine {
@@ -24,6 +31,7 @@ pub struct TradingEngine {
     risk: Arc<dyn RiskEvaluator>,
     broker: Arc<dyn BrokerPort>,
     storage: Arc<dyn StoragePort>,
+    clock: Arc<dyn Clock>,
     order_quantity: Quantity,
 }
 
@@ -34,6 +42,7 @@ impl TradingEngine {
         risk: Arc<dyn RiskEvaluator>,
         broker: Arc<dyn BrokerPort>,
         storage: Arc<dyn StoragePort>,
+        clock: Arc<dyn Clock>,
         order_quantity: Quantity,
     ) -> Self {
         Self {
@@ -41,6 +50,7 @@ impl TradingEngine {
             risk,
             broker,
             storage,
+            clock,
             order_quantity,
         }
     }
@@ -61,7 +71,7 @@ impl TradingEngine {
             return Ok(ExecutionOutcome::NoSignal);
         };
 
-        let intent = OrderIntent::from_signal(&signal, self.order_quantity, Utc::now());
+        let intent = OrderIntent::from_signal(&signal, self.order_quantity, self.clock.now());
         self.storage.persist_intent(&intent).await?;
 
         let decision = self.risk.evaluate(&intent, context).await?;
@@ -73,18 +83,18 @@ impl TradingEngine {
             });
         }
 
-        let approved = ApprovedOrder::new(intent, &decision, Utc::now())?;
+        let approved = ApprovedOrder::new(intent, &decision, self.clock.now())?;
         let mut order = approved.order().clone();
         self.storage.persist_order(&order).await?;
 
-        order.transition(OrderStatus::Submitted, Utc::now())?;
-        order.submitted_at = Some(Utc::now());
+        order.transition(OrderStatus::Submitted, self.clock.now())?;
+        order.submitted_at = Some(self.clock.now());
         self.storage.persist_order(&order).await?;
 
         let receipt = match self.broker.submit(&approved).await {
             Ok(receipt) => receipt,
             Err(error) => {
-                order.transition(OrderStatus::Rejected, Utc::now())?;
+                order.transition(OrderStatus::Rejected, self.clock.now())?;
                 self.storage.persist_order(&order).await?;
                 return Ok(ExecutionOutcome::BrokerRejected {
                     order_id: order.id,
@@ -108,18 +118,20 @@ impl TradingEngine {
             self.storage.persist_order(&order).await?;
         }
 
-        Ok(ExecutionOutcome::Filled { order })
+        Ok(ExecutionOutcome::Filled {
+            order: Box::new(order),
+        })
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use chrono::{Duration as ChronoDuration, NaiveDate};
+    use chrono::{Duration as ChronoDuration, NaiveDate, Utc};
     use rust_decimal::Decimal;
     use std::time::Duration;
     use trading_domain::{
-        Currency, Exchange, Instrument, Money, Price, Quote, Side, StrategyId, TradingMode,
+        Currency, Exchange, Instrument, Money, Price, Quote, StrategyId, TradingMode,
     };
     use trading_paper_broker::{ExecutionModel, FillPolicy, PaperBroker};
     use trading_risk::{RiskLimits, RuleBasedRisk, SystemClock};
@@ -152,12 +164,12 @@ mod tests {
             mode: TradingMode::Paper,
             quote: quote.clone(),
             market_session_open: true,
-            settled_cash: Money::new(Decimal::new(100_000, 0)).expect("cash"),
-            position_exposure: Money::ZERO,
-            strategy_exposure: Money::ZERO,
-            portfolio_exposure: Money::ZERO,
-            daily_loss: Money::ZERO,
-            drawdown: Money::ZERO,
+            settled_cash: Money::new(Decimal::new(100_000, 0), Currency::Usd).expect("cash"),
+            position_exposure: Money::zero(Currency::Usd),
+            strategy_exposure: Money::zero(Currency::Usd),
+            portfolio_exposure: Money::zero(Currency::Usd),
+            daily_loss: Money::zero(Currency::Usd),
+            drawdown: Money::zero(Currency::Usd),
             duplicate_order: false,
             kill_switch_active: false,
         };
@@ -176,12 +188,15 @@ mod tests {
         );
         let limits = RiskLimits {
             maximum_quote_age: ChronoDuration::seconds(5),
-            maximum_order_value: Money::new(Decimal::new(5_000, 0)).expect("limit"),
-            maximum_position_exposure: Money::new(Decimal::new(10_000, 0)).expect("limit"),
-            maximum_strategy_exposure: Money::new(Decimal::new(25_000, 0)).expect("limit"),
-            maximum_portfolio_exposure: Money::new(Decimal::new(100_000, 0)).expect("limit"),
-            maximum_daily_loss: Money::new(Decimal::new(5_000, 0)).expect("limit"),
-            maximum_drawdown: Money::new(Decimal::new(10_000, 0)).expect("limit"),
+            maximum_order_value: Money::new(Decimal::new(5_000, 0), Currency::Usd).expect("limit"),
+            maximum_position_exposure: Money::new(Decimal::new(10_000, 0), Currency::Usd)
+                .expect("limit"),
+            maximum_strategy_exposure: Money::new(Decimal::new(25_000, 0), Currency::Usd)
+                .expect("limit"),
+            maximum_portfolio_exposure: Money::new(Decimal::new(100_000, 0), Currency::Usd)
+                .expect("limit"),
+            maximum_daily_loss: Money::new(Decimal::new(5_000, 0), Currency::Usd).expect("limit"),
+            maximum_drawdown: Money::new(Decimal::new(10_000, 0), Currency::Usd).expect("limit"),
             maximum_spread_fraction: Decimal::new(1, 2),
         };
         TradingEngine::new(
@@ -193,6 +208,7 @@ mod tests {
             )),
             broker,
             storage,
+            Arc::new(SystemClock),
             Quantity::new(Decimal::ONE).expect("quantity"),
         )
     }
@@ -203,7 +219,8 @@ mod tests {
         let storage = Arc::new(InMemoryStorage::new());
         let broker = Arc::new(PaperBroker::new(ExecutionModel {
             price: context.quote.ask,
-            fee: Money::new(Decimal::new(1, 0)).expect("fee"),
+            currency: Currency::Usd,
+            fee: Money::new(Decimal::new(1, 0), Currency::Usd).expect("fee"),
             latency: Duration::ZERO,
             fill_policy: FillPolicy::PartialThenFull,
         }));
@@ -226,7 +243,8 @@ mod tests {
         let storage = Arc::new(InMemoryStorage::new());
         let broker = Arc::new(PaperBroker::new(ExecutionModel {
             price: context.quote.ask,
-            fee: Money::ZERO,
+            currency: Currency::Usd,
+            fee: Money::zero(Currency::Usd),
             latency: Duration::ZERO,
             fill_policy: FillPolicy::Full,
         }));
@@ -252,7 +270,8 @@ mod tests {
         let storage = Arc::new(InMemoryStorage::new());
         let broker = Arc::new(PaperBroker::new(ExecutionModel {
             price: context.quote.ask,
-            fee: Money::ZERO,
+            currency: Currency::Usd,
+            fee: Money::zero(Currency::Usd),
             latency: Duration::ZERO,
             fill_policy: FillPolicy::Full,
         }));
