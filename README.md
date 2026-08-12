@@ -101,5 +101,6 @@ cargo run --bin trading-backtester
 # cd research/python && pip install -e . && python -m trading_research_offline.train_baseline
 ```
 
-See `docs/adr` for architectural decisions and `docs/operations.md` for
-deployment, metrics, backup, and recovery guidance.
+Open `docs/user-guide.html` for a browser-friendly usage guide. See `docs/adr`
+for architectural decisions and `docs/operations.md` for deployment, metrics,
+backup, and recovery guidance.
