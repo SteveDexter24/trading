@@ -1,0 +1,27 @@
+[package]
+name = "trading-research"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+chrono.workspace = true
+rust_decimal.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+trading-domain = { path = "../domain" }
+trading-execution = { path = "../execution" }
+trading-paper-broker = { path = "../paper-broker" }
+trading-portfolio = { path = "../portfolio" }
+trading-risk = { path = "../risk" }
+trading-storage = { path = "../storage" }
+uuid.workspace = true
+
+[dev-dependencies]
+trading-ml-inference = { path = "../ml-inference" }
+trading-strategy = { path = "../strategy" }
+
+[lints]
+workspace = true

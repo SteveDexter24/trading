@@ -11,6 +11,7 @@ mod numeric;
 mod order;
 mod portfolio;
 mod ports;
+mod research;
 mod risk;
 mod strategy;
 
@@ -24,6 +25,9 @@ pub use order::{
 };
 pub use portfolio::{CashBalance, Portfolio, Position};
 pub use ports::{BrokerPort, Clock, MarketDataPort, RiskEvaluator, StoragePort, StrategyPort};
+pub use research::{
+    FeatureSet, FeatureVersion, ModelArtifact, Predictor, ResearchPartition, ScoredPrediction,
+};
 pub use risk::{RiskContext, RiskDecision, RiskOutcome, TradingMode};
 pub use strategy::{ModelVersion, Prediction, Signal, StrategyId};
 

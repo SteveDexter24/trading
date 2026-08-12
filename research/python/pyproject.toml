@@ -1,0 +1,22 @@
+[project]
+name = "trading-research-offline"
+version = "0.1.0"
+description = "Offline feature training and ONNX export for the trading system"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=2.0",
+  "pandas>=2.2",
+  "scikit-learn>=1.5",
+  "onnx>=1.16",
+  "skl2onnx>=1.17",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]

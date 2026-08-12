@@ -1,5 +1,5 @@
 [package]
-name = "trading-strategy"
+name = "trading-ml-inference"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -7,12 +7,12 @@ license.workspace = true
 
 [dependencies]
 async-trait.workspace = true
+chrono.workspace = true
 rust_decimal.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 trading-domain = { path = "../domain" }
 uuid.workspace = true
-
-[dev-dependencies]
-chrono.workspace = true
 
 [lints]
 workspace = true

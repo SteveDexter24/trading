@@ -38,8 +38,12 @@ claim release before submission, and a shared kill switch via storage.
 | `crates/paper-broker` | Idempotent simulated fills |
 | `crates/storage` | In-memory test adapter, PostgreSQL adapter, migrations |
 | `crates/webull-adapter` | Fail-closed HTTP/MQTT/gRPC boundary |
+| `crates/research` | Walk-forward backtests, sim clock, performance metrics |
+| `crates/ml-inference` | Versioned predictors; ONNX boundary; no in-process training |
 | `apps/trading-engine` | Synthetic end-to-end paper flow |
+| `apps/backtester` | Research backtest using prediction-gated strategy |
 | `apps/api` | Read-only status API and authenticated kill switch |
+| `research/python` | Offline training + ONNX export (never imported by runtime) |
 
 ## Verify and run
 
@@ -78,6 +82,24 @@ backtesting runner remain adapter work. Domain contracts already separate
 strategies, risk, prediction versions, clocks, currencies, exchange timezones,
 and trading dates. ML training is intentionally absent; future offline training
 must export versioned ONNX artifacts, while ML may only propose signals.
+
+## Research and ML
+
+Quant research is split from execution:
+
+1. Build point-in-time features (`quote-momentum-v1` today).
+2. Score a versioned predictor (`DeterministicResearchModel` now; ONNX later).
+3. Emit signals that carry prediction metadata.
+4. Reuse the same risk/execution ports in `apps/backtester`.
+5. Train offline in `research/python` and export ONNX + digest metadata.
+
+ML may propose signals only. It cannot size or approve orders.
+
+```sh
+cargo run --bin trading-backtester
+# offline training (separate Python environment):
+# cd research/python && pip install -e . && python -m trading_research_offline.train_baseline
+```
 
 See `docs/adr` for architectural decisions and `docs/operations.md` for
 deployment, metrics, backup, and recovery guidance.

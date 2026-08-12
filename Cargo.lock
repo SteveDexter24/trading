@@ -2747,6 +2747,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "trading-backtester"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "rust_decimal",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "trading-domain",
+ "trading-ml-inference",
+ "trading-research",
+ "trading-risk",
+ "trading-strategy",
+ "uuid",
+]
+
+[[package]]
 name = "trading-domain"
 version = "0.1.0"
 dependencies = [
@@ -2806,6 +2824,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "trading-ml-inference"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "trading-domain",
+ "uuid",
+]
+
+[[package]]
 name = "trading-paper-broker"
 version = "0.1.0"
 dependencies = [
@@ -2825,6 +2856,26 @@ dependencies = [
  "proptest",
  "rust_decimal",
  "trading-domain",
+ "uuid",
+]
+
+[[package]]
+name = "trading-research"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "rust_decimal",
+ "serde",
+ "serde_json",
+ "tokio",
+ "trading-domain",
+ "trading-execution",
+ "trading-ml-inference",
+ "trading-paper-broker",
+ "trading-portfolio",
+ "trading-risk",
+ "trading-storage",
+ "trading-strategy",
  "uuid",
 ]
 
@@ -2859,6 +2910,7 @@ name = "trading-strategy"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "chrono",
  "rust_decimal",
  "trading-domain",
  "uuid",

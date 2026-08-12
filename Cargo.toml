@@ -1,12 +1,15 @@
 [workspace]
 members = [
     "apps/api",
+    "apps/backtester",
     "apps/trading-engine",
     "crates/domain",
     "crates/execution",
     "crates/market-data",
+    "crates/ml-inference",
     "crates/paper-broker",
     "crates/portfolio",
+    "crates/research",
     "crates/risk",
     "crates/storage",
     "crates/strategy",
