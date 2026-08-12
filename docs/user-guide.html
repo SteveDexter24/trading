@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Trading — User Guide</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Syne:wght@600;700;800&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --ink: #13202b;
+        --ink-soft: #3a4a57;
+        --paper: #f3f6f8;
+        --paper-deep: #e4ebf0;
+        --line: #c5d0d8;
+        --accent: #0a7a72;
+        --accent-deep: #06554f;
+        --code-bg: #1a2833;
+        --code-fg: #d7e4ec;
+        --warn: #8a4b12;
+        --max: 72rem;
+        --ease: cubic-bezier(0.22, 1, 0.36, 1);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html {
+        scroll-behavior: smooth;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background:
+          radial-gradient(1200px 500px at 10% -10%, rgba(10, 122, 114, 0.12), transparent 60%),
+          linear-gradient(180deg, #eef3f6 0%, var(--paper) 28%, #f7f9fa 100%);
+        font-family: "IBM Plex Sans", sans-serif;
+        line-height: 1.55;
+        font-size: 1.05rem;
+      }
+
+      a {
+        color: var(--accent-deep);
+      }
+
+      a:hover {
+        color: var(--accent);
+      }
+
+      .wrap {
+        width: min(100% - 2rem, var(--max));
+        margin-inline: auto;
+      }
+
+      /* —— Hero —— */
+      .hero {
+        position: relative;
+        min-height: 100svh;
+        display: grid;
+        align-content: end;
+        padding: 1.25rem 0 3.5rem;
+        color: #f4f7f9;
+        overflow: hidden;
+        isolation: isolate;
+      }
+
+      .hero-media {
+        position: absolute;
+        inset: 0;
+        z-index: -2;
+        background:
+          linear-gradient(180deg, rgba(12, 22, 30, 0.35) 0%, rgba(12, 22, 30, 0.72) 55%, rgba(12, 22, 30, 0.92) 100%),
+          url("https://images.unsplash.com/photo-1611974789855-9c2a0a7236a3?auto=format&fit=crop&w=2400&q=80")
+            center / cover no-repeat;
+        transform: scale(1.04);
+        animation: hero-drift 18s var(--ease) infinite alternate;
+      }
+
+      .hero-grain {
+        position: absolute;
+        inset: 0;
+        z-index: -1;
+        opacity: 0.18;
+        background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+        pointer-events: none;
+      }
+
+      .hero-brand {
+        font-family: "Syne", sans-serif;
+        font-weight: 800;
+        font-size: clamp(3.6rem, 12vw, 8.5rem);
+        line-height: 0.9;
+        letter-spacing: -0.04em;
+        margin: 0 0 1.25rem;
+        max-width: 12ch;
+        animation: rise 0.9s var(--ease) both;
+      }
+
+      .hero h1 {
+        font-family: "Syne", sans-serif;
+        font-weight: 700;
+        font-size: clamp(1.45rem, 3.2vw, 2.15rem);
+        line-height: 1.15;
+        letter-spacing: -0.02em;
+        margin: 0 0 0.75rem;
+        max-width: 22ch;
+        animation: rise 0.9s var(--ease) 0.08s both;
+      }
+
+      .hero p {
+        margin: 0 0 1.75rem;
+        max-width: 36rem;
+        color: rgba(244, 247, 249, 0.86);
+        font-size: 1.08rem;
+        animation: rise 0.9s var(--ease) 0.16s both;
+      }
+
+      .cta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.75rem 1rem;
+        animation: rise 0.9s var(--ease) 0.24s both;
+      }
+
+      .cta {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 2.85rem;
+        padding: 0.65rem 1.15rem;
+        border-radius: 0.35rem;
+        text-decoration: none;
+        font-weight: 600;
+        letter-spacing: 0.01em;
+        transition: transform 180ms var(--ease), background-color 180ms var(--ease);
+      }
+
+      .cta:hover {
+        transform: translateY(-1px);
+      }
+
+      .cta-primary {
+        background: #d8efe9;
+        color: var(--ink);
+      }
+
+      .cta-primary:hover {
+        background: #ecf8f4;
+        color: var(--ink);
+      }
+
+      .cta-secondary {
+        background: transparent;
+        color: #f4f7f9;
+        border: 1px solid rgba(244, 247, 249, 0.45);
+      }
+
+      .cta-secondary:hover {
+        color: #fff;
+        border-color: rgba(244, 247, 249, 0.85);
+      }
+
+      /* —— Content —— */
+      nav.toc {
+        padding: 1.5rem 0 0.5rem;
+        border-bottom: 1px solid var(--line);
+        margin-bottom: 2.5rem;
+      }
+
+      nav.toc ol {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem 1.25rem;
+        font-size: 0.95rem;
+      }
+
+      nav.toc a {
+        text-decoration: none;
+        color: var(--ink-soft);
+        font-weight: 500;
+      }
+
+      nav.toc a:hover {
+        color: var(--accent-deep);
+      }
+
+      main {
+        padding-bottom: 5rem;
+      }
+
+      section {
+        padding: 2.75rem 0;
+        border-top: 1px solid var(--line);
+      }
+
+      section:first-of-type {
+        border-top: 0;
+        padding-top: 0.5rem;
+      }
+
+      .section-label {
+        display: block;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.78rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--accent-deep);
+        margin-bottom: 0.65rem;
+      }
+
+      section h2 {
+        font-family: "Syne", sans-serif;
+        font-size: clamp(1.7rem, 3vw, 2.35rem);
+        letter-spacing: -0.03em;
+        line-height: 1.1;
+        margin: 0 0 0.7rem;
+        max-width: 18ch;
+      }
+
+      section > p.lead {
+        margin: 0 0 1.5rem;
+        color: var(--ink-soft);
+        max-width: 40rem;
+      }
+
+      .reveal {
+        opacity: 0;
+        transform: translateY(1.1rem);
+        transition: opacity 700ms var(--ease), transform 700ms var(--ease);
+      }
+
+      .reveal.is-visible {
+        opacity: 1;
+        transform: none;
+      }
+
+      .stack {
+        display: grid;
+        gap: 1.25rem;
+      }
+
+      .split {
+        display: grid;
+        gap: 1.5rem;
+      }
+
+      @media (min-width: 860px) {
+        .split {
+          grid-template-columns: 1.1fr 0.9fr;
+          align-items: start;
+        }
+      }
+
+      .callout {
+        border-left: 3px solid var(--accent);
+        padding: 0.35rem 0 0.35rem 1rem;
+        color: var(--ink-soft);
+      }
+
+      .callout strong {
+        color: var(--ink);
+      }
+
+      .warn {
+        border-left-color: var(--warn);
+      }
+
+      pre,
+      code {
+        font-family: "IBM Plex Mono", monospace;
+      }
+
+      pre {
+        margin: 0;
+        padding: 1rem 1.1rem;
+        background: var(--code-bg);
+        color: var(--code-fg);
+        border-radius: 0.4rem;
+        overflow-x: auto;
+        font-size: 0.86rem;
+        line-height: 1.55;
+      }
+
+      :not(pre) > code {
+        background: var(--paper-deep);
+        padding: 0.12rem 0.35rem;
+        border-radius: 0.25rem;
+        font-size: 0.9em;
+      }
+
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.95rem;
+      }
+
+      th,
+      td {
+        text-align: left;
+        padding: 0.7rem 0.6rem;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+
+      th {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.75rem;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
+        color: var(--ink-soft);
+        font-weight: 500;
+      }
+
+      .flow {
+        display: grid;
+        gap: 0.65rem;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 0.86rem;
+      }
+
+      .flow span {
+        display: block;
+        padding: 0.7rem 0.85rem;
+        background: var(--paper-deep);
+        border-radius: 0.3rem;
+      }
+
+      footer {
+        border-top: 1px solid var(--line);
+        padding: 2rem 0 3rem;
+        color: var(--ink-soft);
+        font-size: 0.92rem;
+      }
+
+      @keyframes rise {
+        from {
+          opacity: 0;
+          transform: translateY(1.25rem);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+
+      @keyframes hero-drift {
+        from {
+          transform: scale(1.04) translate3d(0, 0, 0);
+        }
+        to {
+          transform: scale(1.1) translate3d(-1.2%, -1%, 0);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+        .hero-media,
+        .hero-brand,
+        .hero h1,
+        .hero p,
+        .cta-row,
+        .reveal {
+          animation: none !important;
+          transition: none !important;
+          opacity: 1;
+          transform: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="hero">
+      <div class="hero-media" aria-hidden="true"></div>
+      <div class="hero-grain" aria-hidden="true"></div>
+      <div class="wrap">
+        <p class="hero-brand">Trading</p>
+        <h1>How to use the paper system</h1>
+        <p>
+          Run the paper engine, inspect status over the API, backtest prediction-gated
+          strategies, and train models offline — without enabling live Webull trading.
+        </p>
+        <div class="cta-row">
+          <a class="cta cta-primary" href="#quick-start">Start here</a>
+          <a class="cta cta-secondary" href="#crates">Trading vs ML crates</a>
+        </div>
+      </div>
+    </header>
+
+    <div class="wrap">
+      <nav class="toc" aria-label="Guide sections">
+        <ol>
+          <li><a href="#quick-start">Quick start</a></li>
+          <li><a href="#crates">Crates</a></li>
+          <li><a href="#engine">Paper engine</a></li>
+          <li><a href="#api">Status API</a></li>
+          <li><a href="#backtester">Backtester</a></li>
+          <li><a href="#ml">Offline ML</a></li>
+          <li><a href="#config">Config &amp; safety</a></li>
+          <li><a href="#verify">Verify</a></li>
+        </ol>
+      </nav>
+
+      <main>
+        <section id="quick-start" class="reveal">
+          <span class="section-label">01 · Quick start</span>
+          <h2>Get a paper run in minutes</h2>
+          <p class="lead">
+            You need a recent Rust toolchain. PostgreSQL is optional for local demos.
+          </p>
+          <div class="stack">
+            <pre><code>git clone https://github.com/SteveDexter24/trading.git
+cd trading
+cargo test --workspace --all-features
+cargo run --bin trading-engine</code></pre>
+            <p class="callout">
+              Without <code>DATABASE_URL</code>, the engine uses an in-memory adapter.
+              With Docker: <code>docker compose up --build</code> starts Postgres and the engine.
+            </p>
+          </div>
+        </section>
+
+        <section id="crates" class="reveal">
+          <span class="section-label">02 · Architecture</span>
+          <h2>Trading and ML stay in separate crates</h2>
+          <p class="lead">
+            They share domain contracts for features, predictions, and signals. ML never sizes
+            or approves orders.
+          </p>
+          <div class="split">
+            <div class="stack">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Path</th>
+                    <th>Job</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td><code>crates/strategy</code> → <code>risk</code> → <code>execution</code> → <code>paper-broker</code></td>
+                    <td>Live paper trading path</td>
+                  </tr>
+                  <tr>
+                    <td><code>crates/ml-inference</code></td>
+                    <td>Versioned scoring boundary (no training)</td>
+                  </tr>
+                  <tr>
+                    <td><code>crates/research</code> + <code>apps/backtester</code></td>
+                    <td>Walk-forward backtests and metrics</td>
+                  </tr>
+                  <tr>
+                    <td><code>research/python</code></td>
+                    <td>Offline train + ONNX export</td>
+                  </tr>
+                  <tr>
+                    <td><code>crates/domain</code></td>
+                    <td>Shared types and ports</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="flow" aria-label="Signal path">
+              <span>1. Features (quote-momentum-v1)</span>
+              <span>2. Predictor scores → ScoredPrediction</span>
+              <span>3. Strategy may emit Signal</span>
+              <span>4. Risk sizes / approves (or blocks)</span>
+              <span>5. Paper broker fills</span>
+            </div>
+          </div>
+        </section>
+
+        <section id="engine" class="reveal">
+          <span class="section-label">03 · Paper engine</span>
+          <h2>Run the synthetic end-to-end flow</h2>
+          <p class="lead">
+            <code>trading-engine</code> processes one synthetic quote through strategy, risk,
+            paper broker, and fill, then logs a JSON audit result.
+          </p>
+          <div class="stack">
+            <pre><code># in-memory
+cargo run --bin trading-engine
+
+# with Postgres (migrations apply on connect)
+export DATABASE_URL='postgres://trading:local-development-only@localhost:5432/trading'
+cargo run --bin trading-engine
+
+# or via Compose
+docker compose up --build</code></pre>
+            <p class="callout">
+              Mode is fixed to <strong>Paper</strong>. Production Webull submission has no
+              constructible path in this codebase.
+            </p>
+          </div>
+        </section>
+
+        <section id="api" class="reveal">
+          <span class="section-label">04 · Status API</span>
+          <h2>Inspect state; flip the kill switch</h2>
+          <p class="lead">
+            The API is read-only for trading data. There is no order-entry route. Listen address:
+            <code>0.0.0.0:8080</code>.
+          </p>
+          <div class="stack">
+            <pre><code>export ADMIN_API_TOKEN='replace-me'
+# optional shared DB with the engine:
+# export DATABASE_URL='postgres://trading:local-development-only@localhost:5432/trading'
+cargo run --bin trading-api</code></pre>
+            <table>
+              <thead>
+                <tr>
+                  <th>Method</th>
+                  <th>Path</th>
+                  <th>Notes</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>GET</td>
+                  <td><code>/health</code></td>
+                  <td>Liveness</td>
+                </tr>
+                <tr>
+                  <td>GET</td>
+                  <td><code>/ready</code></td>
+                  <td>Storage reachable</td>
+                </tr>
+                <tr>
+                  <td>GET</td>
+                  <td><code>/v1/status</code></td>
+                  <td>Paper mode + kill-switch flag</td>
+                </tr>
+                <tr>
+                  <td>GET</td>
+                  <td><code>/v1/orders</code>, <code>/fills</code>, <code>/risk-decisions</code></td>
+                  <td>Persisted collections</td>
+                </tr>
+                <tr>
+                  <td>GET</td>
+                  <td><code>/v1/portfolio</code>, <code>/positions</code>, <code>/signals</code></td>
+                  <td>Stub empty collections in this revision</td>
+                </tr>
+                <tr>
+                  <td>POST</td>
+                  <td><code>/v1/system/kill-switch</code></td>
+                  <td>Bearer <code>ADMIN_API_TOKEN</code> required</td>
+                </tr>
+              </tbody>
+            </table>
+            <pre><code>curl -s http://127.0.0.1:8080/v1/status | jq
+
+curl -s -X POST http://127.0.0.1:8080/v1/system/kill-switch \
+  -H "Authorization: Bearer replace-me" \
+  -H "Content-Type: application/json" \
+  -d '{"active": true}'</code></pre>
+          </div>
+        </section>
+
+        <section id="backtester" class="reveal">
+          <span class="section-label">05 · Research backtester</span>
+          <h2>Walk-forward with prediction-gated signals</h2>
+          <p class="lead">
+            Reuses strategy and risk ports under a simulation clock. Today it scores with
+            <code>DeterministicResearchModel</code> until ONNX runtime wiring lands.
+          </p>
+          <div class="stack">
+            <pre><code>cargo run --bin trading-backtester</code></pre>
+            <p class="callout">
+              Logs walk-forward train / validation / test windows, then a metrics report
+              (CAGR proxy, volatility, Sharpe, Sortino, drawdown, turnover, hit rate,
+              exposure, costs, benchmark).
+            </p>
+          </div>
+        </section>
+
+        <section id="ml" class="reveal">
+          <span class="section-label">06 · Offline ML</span>
+          <h2>Train outside the Rust runtime</h2>
+          <p class="lead">
+            Python lives in <code>research/python</code>. Export frozen ONNX + metadata; Rust only
+            scores. Predictions may propose signals — risk still decides.
+          </p>
+          <div class="stack">
+            <pre><code>cd research/python
+python -m venv .venv
+source .venv/bin/activate
+pip install -e .
+python -m trading_research_offline.train_baseline --output-dir artifacts</code></pre>
+            <p class="callout">
+              Writes <code>artifacts/offline-logistic-quote-momentum-v1.onnx</code> and a
+              matching <code>.json</code> digest/metadata file. Point
+              <code>OnnxPredictor</code> at the artifact after the ONNX runtime path is enabled.
+            </p>
+          </div>
+        </section>
+
+        <section id="config" class="reveal">
+          <span class="section-label">07 · Config &amp; safety</span>
+          <h2>Environment and hard limits</h2>
+          <p class="lead">
+            Inject secrets through the process environment or a secret manager. Do not commit
+            env files. Never log Webull credentials or account IDs.
+          </p>
+          <div class="stack">
+            <table>
+              <thead>
+                <tr>
+                  <th>Variable</th>
+                  <th>Used by</th>
+                  <th>Purpose</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>DATABASE_URL</code></td>
+                  <td>Engine, API</td>
+                  <td>Postgres; omit for in-memory</td>
+                </tr>
+                <tr>
+                  <td><code>ADMIN_API_TOKEN</code></td>
+                  <td>API</td>
+                  <td>Bearer token for kill switch</td>
+                </tr>
+                <tr>
+                  <td><code>RUST_LOG</code></td>
+                  <td>All apps</td>
+                  <td>Tracing filter (default <code>info</code>)</td>
+                </tr>
+              </tbody>
+            </table>
+            <p class="callout warn">
+              <strong>Fail-closed:</strong> paper mode only; Webull production submission is
+              disabled in code; the sandbox adapter also refuses submit in this iteration;
+              intents persist before broker actions.
+            </p>
+          </div>
+        </section>
+
+        <section id="verify" class="reveal">
+          <span class="section-label">08 · Verify</span>
+          <h2>Same checks as CI</h2>
+          <p class="lead">
+            Run these before merging changes. Postgres integration tests activate when
+            <code>TEST_DATABASE_URL</code> is set.
+          </p>
+          <pre><code>cargo fmt --all --check
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace --all-features
+cargo run --bin trading-engine
+cargo run --bin trading-backtester</code></pre>
+        </section>
+      </main>
+
+      <footer>
+        <p>
+          Deeper decisions: <a href="./adr/0006-research-ml-and-backtesting.md">ADR 0006</a>,
+          <a href="./operations.md">operations</a>, and the repository
+          <a href="../README.md">README</a>.
+        </p>
+      </footer>
+    </div>
+
+    <script>
+      const reveals = document.querySelectorAll(".reveal");
+      if ("IntersectionObserver" in window) {
+        const observer = new IntersectionObserver(
+          (entries) => {
+            for (const entry of entries) {
+              if (entry.isIntersecting) {
+                entry.target.classList.add("is-visible");
+                observer.unobserve(entry.target);
+              }
+            }
+          },
+          { rootMargin: "0px 0px -8% 0px", threshold: 0.12 }
+        );
+        reveals.forEach((el) => observer.observe(el));
+      } else {
+        reveals.forEach((el) => el.classList.add("is-visible"));
+      }
+    </script>
+  </body>
+</html>
