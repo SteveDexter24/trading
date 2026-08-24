@@ -13,6 +13,20 @@ target
 # Contains mutation testing data
 **/mutants.out*/
 
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Offline research artifacts
+research/python/.venv/
+research/python/**/__pycache__/
+research/python/*.egg-info/
+research/python/artifacts/
+*.onnx
+
 # RustRover
 #  JetBrains specific template is maintained in a separate JetBrains.gitignore that can
 #  be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore

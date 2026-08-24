@@ -1,0 +1,21 @@
+[package]
+name = "trading-portfolio-planner"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "trading-portfolio-planner"
+path = "src/main.rs"
+
+[dependencies]
+chrono.workspace = true
+rust_decimal.workspace = true
+serde_json.workspace = true
+trading-domain = { path = "../../crates/domain" }
+trading-portfolio = { path = "../../crates/portfolio" }
+uuid.workspace = true
+
+[lints]
+workspace = true

@@ -1,0 +1,20 @@
+[package]
+name = "trading-portfolio"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+chrono.workspace = true
+rust_decimal.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+trading-domain = { path = "../domain" }
+
+[dev-dependencies]
+proptest = "1"
+uuid.workspace = true
+
+[lints]
+workspace = true

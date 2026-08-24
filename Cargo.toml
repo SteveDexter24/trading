@@ -1,0 +1,59 @@
+[workspace]
+members = [
+    "apps/api",
+    "apps/backtester",
+    "apps/portfolio-planner",
+    "apps/trading-engine",
+    "crates/domain",
+    "crates/execution",
+    "crates/market-data",
+    "crates/ml-inference",
+    "crates/paper-broker",
+    "crates/portfolio",
+    "crates/research",
+    "crates/risk",
+    "crates/storage",
+    "crates/strategy",
+    "crates/webull-adapter",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.94"
+license = "MIT"
+
+[workspace.dependencies]
+async-trait = "0.1"
+axum = "0.8"
+chrono = { version = "0.4", features = ["serde"] }
+reqwest = { version = "0.13", default-features = false, features = ["json", "rustls"] }
+rumqttc = { version = "0.25", default-features = false, features = ["use-rustls"] }
+rust_decimal = { version = "1", features = ["serde-with-str"] }
+secrecy = "0.10"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sqlx = { version = "0.9", default-features = false, features = [
+    "runtime-tokio",
+    "tls-rustls-ring-webpki",
+    "postgres",
+    "chrono",
+    "uuid",
+    "rust_decimal",
+    "json",
+    "macros",
+    "migrate",
+] }
+thiserror = "2"
+tokio = { version = "1", features = ["macros", "rt-multi-thread", "signal", "sync", "time"] }
+tonic = { version = "0.14", default-features = false, features = ["channel", "tls-webpki-roots"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+uuid = { version = "1", features = ["serde", "v4"] }
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = "deny"
