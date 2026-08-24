@@ -324,7 +324,7 @@ fn group_has_capacity(
     group_weights: &BTreeMap<String, Decimal>,
     group_caps: &BTreeMap<String, Decimal>,
 ) -> bool {
-    item.estimate.risk_group.as_ref().map_or(true, |group| {
+    item.estimate.risk_group.as_ref().is_none_or(|group| {
         group_caps.get(group).is_none_or(|cap| {
             group_weights.get(group).copied().unwrap_or(Decimal::ZERO) + ALLOCATION_EPSILON < *cap
         })
