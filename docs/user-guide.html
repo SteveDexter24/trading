@@ -405,6 +405,7 @@
           <li><a href="#engine">Paper engine</a></li>
           <li><a href="#api">Status API</a></li>
           <li><a href="#backtester">Backtester</a></li>
+          <li><a href="#portfolio">Portfolio construction</a></li>
           <li><a href="#ml">Offline ML</a></li>
           <li><a href="#config">Config &amp; safety</a></li>
           <li><a href="#verify">Verify</a></li>
@@ -583,8 +584,29 @@ curl -s -X POST http://127.0.0.1:8080/v1/system/kill-switch \
           </div>
         </section>
 
+        <section id="portfolio" class="reveal">
+          <span class="section-label">06 · Portfolio construction</span>
+          <h2>Turn ETF and gold forecasts into target weights</h2>
+          <p class="lead">
+            The pure portfolio layer compares point-in-time alpha estimates, reserves cash,
+            caps positions and risk groups, then creates a lot-valid rebalance proposal.
+          </p>
+          <div class="stack">
+            <pre><code>cargo run --bin trading-portfolio-planner</code></pre>
+            <p class="callout">
+              The example allocates between VOO and GLD using risk-adjusted alpha, keeps
+              10% target cash, and limits gross turnover. Its output is a proposal only;
+              every trade must still pass the paper execution risk gate.
+            </p>
+            <p>
+              See <a href="./portfolio-construction.md">portfolio construction</a> for input
+              validation, construction methods, constraints, and current limitations.
+            </p>
+          </div>
+        </section>
+
         <section id="ml" class="reveal">
-          <span class="section-label">06 · Offline ML</span>
+          <span class="section-label">07 · Offline ML</span>
           <h2>Train outside the Rust runtime</h2>
           <p class="lead">
             Python lives in <code>research/python</code>. Export frozen ONNX + metadata; Rust only
@@ -605,7 +627,7 @@ python -m trading_research_offline.train_baseline --output-dir artifacts</code><
         </section>
 
         <section id="config" class="reveal">
-          <span class="section-label">07 · Config &amp; safety</span>
+          <span class="section-label">08 · Config &amp; safety</span>
           <h2>Environment and hard limits</h2>
           <p class="lead">
             Inject secrets through the process environment or a secret manager. Do not commit
@@ -647,7 +669,7 @@ python -m trading_research_offline.train_baseline --output-dir artifacts</code><
         </section>
 
         <section id="verify" class="reveal">
-          <span class="section-label">08 · Verify</span>
+          <span class="section-label">09 · Verify</span>
           <h2>Same checks as CI</h2>
           <p class="lead">
             Run these before merging changes. Postgres integration tests activate when
@@ -657,7 +679,8 @@ python -m trading_research_offline.train_baseline --output-dir artifacts</code><
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features
 cargo run --bin trading-engine
-cargo run --bin trading-backtester</code></pre>
+cargo run --bin trading-backtester
+cargo run --bin trading-portfolio-planner</code></pre>
         </section>
       </main>
 

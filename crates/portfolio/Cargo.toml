@@ -6,11 +6,13 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+chrono.workspace = true
 rust_decimal.workspace = true
+serde.workspace = true
+thiserror.workspace = true
 trading-domain = { path = "../domain" }
 
 [dev-dependencies]
-chrono.workspace = true
 proptest = "1"
 uuid.workspace = true
 

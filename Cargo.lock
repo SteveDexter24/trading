@@ -2855,7 +2855,21 @@ dependencies = [
  "chrono",
  "proptest",
  "rust_decimal",
+ "serde",
+ "thiserror",
  "trading-domain",
+ "uuid",
+]
+
+[[package]]
+name = "trading-portfolio-planner"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "rust_decimal",
+ "serde_json",
+ "trading-domain",
+ "trading-portfolio",
  "uuid",
 ]
 

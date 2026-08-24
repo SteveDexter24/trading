@@ -2,6 +2,7 @@
 members = [
     "apps/api",
     "apps/backtester",
+    "apps/portfolio-planner",
     "apps/trading-engine",
     "crates/domain",
     "crates/execution",

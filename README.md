@@ -33,7 +33,7 @@ claim release before submission, and a shared kill switch via storage.
 | `crates/market-data` | Freshness and sequence validation |
 | `crates/strategy` | Deterministic strategy baseline |
 | `crates/risk` | Paper-only pre-trade risk checks |
-| `crates/portfolio` | Exact accounting functions and property tests |
+| `crates/portfolio` | Exact accounting, constrained allocation, and rebalance planning |
 | `crates/execution` | Persist-risk-submit-reconcile orchestration |
 | `crates/paper-broker` | Idempotent simulated fills |
 | `crates/storage` | In-memory test adapter, PostgreSQL adapter, migrations |
@@ -42,6 +42,7 @@ claim release before submission, and a shared kill switch via storage.
 | `crates/ml-inference` | Versioned predictors; ONNX boundary; no in-process training |
 | `apps/trading-engine` | Synthetic end-to-end paper flow |
 | `apps/backtester` | Research backtest using prediction-gated strategy |
+| `apps/portfolio-planner` | ETF/gold target allocation and rebalance example |
 | `apps/api` | Read-only status API and authenticated kill switch |
 | `research/python` | Offline training + ONNX export (never imported by runtime) |
 
@@ -52,6 +53,7 @@ cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features
 cargo run --bin trading-engine
+cargo run --bin trading-portfolio-planner
 ```
 
 The engine emits a structured JSON audit result for a synthetic quote, signal,
@@ -97,6 +99,7 @@ ML may propose signals only. It cannot size or approve orders.
 
 ```sh
 cargo run --bin trading-backtester
+cargo run --bin trading-portfolio-planner
 # offline training (separate Python environment):
 # cd research/python && pip install -e . && python -m trading_research_offline.train_baseline
 ```
